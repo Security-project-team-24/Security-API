@@ -1,6 +1,7 @@
-package team24.security.utils;
+package team24.security.service;
 
 import io.github.cdimascio.dotenv.Dotenv;
+import org.springframework.stereotype.Service;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -9,16 +10,21 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
-public class Encryption {
-    public static String encrypt(String input) throws Exception {
-        Dotenv dotenv = Dotenv.load();
-        SecretKeySpec key = new SecretKeySpec(dotenv.get("ENCRYPT_PASSWORD").getBytes(), "AES");
-        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-        cipher.init(Cipher.ENCRYPT_MODE, key);
-        byte[] encryptedBytes = cipher.doFinal(input.getBytes());
-        return Base64.getEncoder().encodeToString(encryptedBytes);
+@Service
+public class EncryptionService {
+    public String encrypt(String input) {
+        try {
+            Dotenv dotenv = Dotenv.load();
+            SecretKeySpec key = new SecretKeySpec(dotenv.get("ENCRYPT_PASSWORD").getBytes(), "AES");
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, key);
+            byte[] encryptedBytes = cipher.doFinal(input.getBytes());
+            return Base64.getEncoder().encodeToString(encryptedBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("Payload could not be encrypted!");
+        }
     }
-    public static String decrypt(String encryptedInput) throws Exception {
+    public String decrypt(String encryptedInput) throws Exception {
         Dotenv dotenv = Dotenv.load();
         SecretKeySpec key = new SecretKeySpec(dotenv.get("ENCRYPT_PASSWORD").getBytes(), "AES");
         Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
@@ -27,7 +33,7 @@ public class Encryption {
         byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
         return new String(decryptedBytes);
     }
-    private static SecretKey generateKey() {
+    private SecretKey generateKey() {
         try {
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
             keyGen.init(128);
@@ -39,7 +45,7 @@ public class Encryption {
         }
         return null;
     }
-    public static String bytesToHex(byte[] bytes) {
+    public String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
         for (int i = 0; i < bytes.length; i++) {
             int v = bytes[i] & 0xFF;
