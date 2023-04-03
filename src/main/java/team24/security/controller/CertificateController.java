@@ -30,4 +30,11 @@ public class CertificateController {
         Certificate cert = certificateService.createIntermediary(dto);
         return new ResponseEntity<>(cert, HttpStatus.OK);
     }
+    @PostMapping("/endCertificate")
+    public ResponseEntity<Certificate> createEndCertificate(
+            @RequestBody CertificateRequestDto dto
+    ) {
+        Certificate cert = certificateService.createEndCertificate(dto);
+        return new ResponseEntity<>(cert, HttpStatus.OK);
+    }
 }

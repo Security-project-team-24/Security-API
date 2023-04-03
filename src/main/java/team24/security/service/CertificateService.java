@@ -40,12 +40,6 @@ public class CertificateService {
 
     private X509Certificate generateCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber, int usage) {
         try {
-            System.out.println(subject);
-            System.out.println(issuer);
-            System.out.println(startDate);
-            System.out.println(endDate);
-            System.out.println(usage);
-
             JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
             builder = builder.setProvider("BC");
 
@@ -58,33 +52,20 @@ public class CertificateService {
                     subject.getPublicKey());
 
             certGen.addExtension(Extension.keyUsage, false, new KeyUsage(usage));
-
-
+            
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
             certConverter = certConverter.setProvider("BC");
             return certConverter.getCertificate(certHolder);
 
-        } catch (CertificateEncodingException e) {
+        } catch (Exception e) {
             e.printStackTrace();
-        } catch (IllegalArgumentException e) {
-            e.printStackTrace();
-        } catch (IllegalStateException e) {
-            e.printStackTrace();
-        } catch (OperatorCreationException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
-            e.printStackTrace();
-        } catch (CertIOException e) {
-            throw new RuntimeException(e);
         }
         return null;
     }
-
     private Certificate create(Certificate certificate) {
         return certificateRepository.save(certificate);
     }
-
     public Certificate findById(UUID uuid) {
         return certificateRepository
                 .findById(uuid)
@@ -98,7 +79,7 @@ public class CertificateService {
         cert.setKeystore("root.jks");
         cert.setSerialNumber(uuid.toString());
         cert.setIssuerSerial(uuid.toString());
-        int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign;
+        int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;;
         //TODO: validate data from issuer and for current certificate
         //Generate bouncy castle certificate with cert data
         X509Certificate certificate = generateCertificate(cert.toSubject(),
@@ -138,6 +119,29 @@ public class CertificateService {
         return cert;
     }
 
+    public Certificate createEndCertificate(CertificateRequestDto dto) {
+        BigInteger uuid = generateUniqueBigInteger();
+        Certificate issuerCert = certificateRepository.findOneBySerialNumber(dto.issuerId);
+        if (issuerCert == null) {
+            throw new RuntimeException("Issuer doesn't exist!");
+        }
+        Certificate cert = dto.mapToModel();
+        cert.setKeystore("endCertificate.jks");
+        cert.setSerialNumber(uuid.toString());
+        int usage =  KeyUsage.keyCertSign | KeyUsage.digitalSignature;
+        //TODO: validate data from issuer and for current certificate
+        X509Certificate certificate = generateCertificate(cert.toSubject(),
+                issuerCert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
+
+        Keystore keystore = keystoreService.findOrCreate("endCertificate.jks");
+        String password = encryptionService.decrypt(keystore.getPassword());
+        fileKeystoreService.load("endCertificate.jks");
+        fileKeystoreService.write(certificate.getSerialNumber().toString(), cert.toIssuer().getPrivateKey(), password.toCharArray(), certificate);
+        fileKeystoreService.save("endCertificate.jks");
+        cert = certificateRepository.save(cert);
+        return cert;
+    }
+
     private BigInteger generateUniqueBigInteger() {
         SecureRandom random = new SecureRandom();
         BigInteger bigInt;
@@ -147,6 +151,4 @@ public class CertificateService {
 
         return bigInt;
     }
-
-
 }
