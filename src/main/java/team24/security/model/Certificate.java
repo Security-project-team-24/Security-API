@@ -42,7 +42,8 @@ public class Certificate {
     private Date validTo;
     @Column(name = "keystore")
     private String keystore;
-
+    @Column(name = "revocation_status")
+    private boolean revocationStatus;
 
     public Subject toSubject() {
         KeyPair keyPairSubject = generateKeyPair();

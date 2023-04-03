@@ -109,4 +109,32 @@ public class FileKeystoreService {
         return false;
     }
 
+    public Certificate readCertificate(String keyStoreFile, String keyStorePass, String alias) {
+        try {
+            //kreiramo instancu KeyStore
+            KeyStore ks = KeyStore.getInstance("JKS", "SUN");
+            //ucitavamo podatke
+            BufferedInputStream in = new BufferedInputStream(new FileInputStream(path + keyStoreFile));
+            ks.load(in, keyStorePass.toCharArray());
+
+            if(ks.isKeyEntry(alias)) {
+                Certificate cert = ks.getCertificate(alias);
+                return cert;
+            }
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        } catch (NoSuchProviderException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 }

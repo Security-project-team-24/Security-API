@@ -76,13 +76,14 @@ public class CertificateService {
         //Generate applicative certificate
         BigInteger uuid = generateUniqueBigInteger();
         Certificate cert = dto.mapToModel();
+        cert.setRevocationStatus(false);
         cert.setKeystore("root.jks");
         cert.setSerialNumber(uuid.toString());
         cert.setIssuerSerial(uuid.toString());
         int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;;
         //TODO: validate data from issuer and for current certificate
         //Generate bouncy castle certificate with cert data
-        if (!VerifyDateRange(dto.startDate, dto.endDate, cert)){
+        if (!verifyDateRange(dto.startDate, dto.endDate, cert)){
             throw new RuntimeException("Date is not valid");
         }
         X509Certificate certificate = generateCertificate(cert.toSubject(),
@@ -106,12 +107,19 @@ public class CertificateService {
             throw new RuntimeException("Issuer doesn't exist!");
         }
         Certificate cert = dto.mapToModel();
+        cert.setRevocationStatus(false);
         cert.setKeystore("intermediary.jks");
         cert.setSerialNumber(uuid.toString());
         int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;
         //TODO: validate data from issuer and for current certificate
-        if (!VerifyDateRange(dto.startDate, dto.endDate, issuerCert)){
+        if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)){
             throw new RuntimeException("Date is not valid");
+        }
+        if (!verifyUsage(issuerCert)){
+            throw new RuntimeException("Issuer cannot generate");
+        }
+        if (issuerCert.isRevocationStatus()){
+            throw new RuntimeException("Issuer is revoked");
         }
         X509Certificate certificate = generateCertificate(cert.toSubject(),
                 issuerCert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
@@ -132,10 +140,20 @@ public class CertificateService {
             throw new RuntimeException("Issuer doesn't exist!");
         }
         Certificate cert = dto.mapToModel();
+        cert.setRevocationStatus(false);
         cert.setKeystore("endCertificate.jks");
         cert.setSerialNumber(uuid.toString());
-        int usage =  KeyUsage.keyCertSign | KeyUsage.digitalSignature;
+        int usage =  KeyUsage.digitalSignature;
         //TODO: validate data from issuer and for current certificate
+        if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)){
+            throw new RuntimeException("Date is not valid");
+        }
+        if (!verifyUsage(issuerCert)){
+            throw new RuntimeException("Issuer cannot generate");
+        }
+        if (issuerCert.isRevocationStatus()){
+            throw new RuntimeException("Issuer is revoked");
+        }
         X509Certificate certificate = generateCertificate(cert.toSubject(),
                 issuerCert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
 
@@ -158,9 +176,19 @@ public class CertificateService {
         return bigInt;
     }
 
-    private boolean VerifyDateRange(Date from, Date to, Certificate issuerCertificate){
+    private boolean verifyDateRange(Date from, Date to, Certificate issuerCertificate){
         boolean isIssuerDateAfterSubjectStart = issuerCertificate.getValidFrom().after(from);
         boolean isIssuerDateBeforeSubjectEnd = issuerCertificate.getValidTo().before(to);
         return !isIssuerDateAfterSubjectStart && !isIssuerDateBeforeSubjectEnd;
     }
+
+    private boolean verifyUsage(Certificate issuerCertificate){
+        Keystore keystore = keystoreService.findByName(issuerCertificate.getKeystore());
+        String password = encryptionService.decrypt(keystore.getPassword());
+        X509Certificate cert = (X509Certificate)fileKeystoreService.readCertificate(keystore.getName(), password, issuerCertificate.getSerialNumber());
+        boolean[] tmp = cert.getKeyUsage();
+
+        return tmp[5];
+    }
+    
 }
