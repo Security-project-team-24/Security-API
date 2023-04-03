@@ -3,7 +3,10 @@ package team24.security.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.bouncycastle.asn1.x500.X500NameBuilder;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 
+import java.security.*;
 import java.util.Date;
 import java.util.UUID;
 
@@ -28,13 +31,58 @@ public class Certificate {
     @Column(name = "organization_unit")
     private String organizationUnit;
     @Column(name = "country")
-    private String county;
-    @Column(name = "uuid", unique = true, nullable = false)
+    private String country;
+    @Column(name = "serial_number", unique = true, nullable = false)
     private String serialNumber;
-    @Column(name = "issuer", nullable = false)
+    @Column(name = "issuer_serial", nullable = false)
     private String issuerSerial;
     @Column(name = "valid_from")
     private Date validFrom;
     @Column(name = "valid_to")
     private Date validTo;
+    @Column(name = "keystore")
+    private String keystore;
+
+
+    public Subject toSubject() {
+        KeyPair keyPairSubject = generateKeyPair();
+        X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
+        builder.addRDN(BCStyle.CN, this.commonName);
+        builder.addRDN(BCStyle.SURNAME, this.surname);
+        builder.addRDN(BCStyle.GIVENNAME, this.commonName);
+        builder.addRDN(BCStyle.O, this.organization);
+        builder.addRDN(BCStyle.OU, this.organizationUnit);
+        builder.addRDN(BCStyle.C, this.country);
+        builder.addRDN(BCStyle.E, this.email);
+        builder.addRDN(BCStyle.UID, this.serialNumber);
+        return new Subject(keyPairSubject.getPublic(), builder.build());
+    }
+
+    public Issuer toIssuer() {
+        KeyPair kp = generateKeyPair();
+        X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
+        builder.addRDN(BCStyle.CN, this.commonName);
+        builder.addRDN(BCStyle.SURNAME, this.surname);
+        builder.addRDN(BCStyle.GIVENNAME, this.commonName);
+        builder.addRDN(BCStyle.O, this.organization);
+        builder.addRDN(BCStyle.OU, this.organizationUnit);
+        builder.addRDN(BCStyle.C, this.country);
+        builder.addRDN(BCStyle.E, this.email);
+        builder.addRDN(BCStyle.UID, this.serialNumber);
+        return new Issuer(kp.getPrivate(), kp.getPublic(), builder.build());
+    }
+
+    private KeyPair generateKeyPair() {
+        try {
+            KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+            SecureRandom random = SecureRandom.getInstance("SHA1PRNG", "SUN");
+            keyGen.initialize(2048, random);
+            return keyGen.generateKeyPair();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchProviderException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }

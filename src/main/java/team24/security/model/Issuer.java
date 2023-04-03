@@ -17,4 +17,9 @@ public class Issuer {
     private PrivateKey privateKey;
     private PublicKey publicKey;
     private X500Name x500Name;
+
+    @Override
+    public String toString() {
+        return X500Name.getDefaultStyle().toString();
+    }
 }

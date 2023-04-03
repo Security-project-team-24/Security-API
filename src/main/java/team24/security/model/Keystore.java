@@ -21,4 +21,5 @@ public class Keystore {
     private String name;
     @Column(name = "password", nullable = false)
     private String password;
+
 }

@@ -12,15 +12,22 @@ import team24.security.service.CertificateService;
 @RequestMapping(value = "/api/certificate")
 @AllArgsConstructor
 public class CertificateController {
-
     private CertificateService certificateService;
-
 
     @PostMapping("/root")
     public ResponseEntity<Certificate> createRoot(
             @RequestBody CertificateRequestDto dto
     ) {
         Certificate cert = certificateService.createRoot(dto);
+        return new ResponseEntity<>(cert, HttpStatus.OK);
+    }
+
+
+    @PostMapping("/intermediary")
+    public ResponseEntity<Certificate> createIntermediary(
+            @RequestBody CertificateRequestDto dto
+    ) {
+        Certificate cert = certificateService.createIntermediary(dto);
         return new ResponseEntity<>(cert, HttpStatus.OK);
     }
 }

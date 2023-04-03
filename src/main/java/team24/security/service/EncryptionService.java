@@ -24,15 +24,22 @@ public class EncryptionService {
             throw new RuntimeException("Payload could not be encrypted!");
         }
     }
-    public String decrypt(String encryptedInput) throws Exception {
-        Dotenv dotenv = Dotenv.load();
-        SecretKeySpec key = new SecretKeySpec(dotenv.get("ENCRYPT_PASSWORD").getBytes(), "AES");
-        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-        cipher.init(Cipher.DECRYPT_MODE, key);
-        byte[] encryptedBytes = Base64.getDecoder().decode(encryptedInput);
-        byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
-        return new String(decryptedBytes);
+
+    public String decrypt(String encryptedInput) {
+        try {
+            Dotenv dotenv = Dotenv.load();
+            SecretKeySpec key = new SecretKeySpec(dotenv.get("ENCRYPT_PASSWORD").getBytes(), "AES");
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, key);
+            byte[] encryptedBytes = Base64.getDecoder().decode(encryptedInput);
+            byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
+            return new String(decryptedBytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Something wrong with decrypthing password!");
+        }
     }
+
     private SecretKey generateKey() {
         try {
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
@@ -45,6 +52,7 @@ public class EncryptionService {
         }
         return null;
     }
+
     public String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
         for (int i = 0; i < bytes.length; i++) {

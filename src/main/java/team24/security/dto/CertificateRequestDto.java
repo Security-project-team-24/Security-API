@@ -28,8 +28,8 @@ public class CertificateRequestDto {
                 .organization(subject.organization)
                 .organizationUnit(subject.organizationUnit)
                 .email(subject.email)
-                .county(subject.country)
-                .issuer(UUID.fromString(issuerId))
+                .country(subject.country)
+                .issuerSerial(issuerId)
                 .validFrom(startDate)
                 .validTo(endDate)
                 .build();

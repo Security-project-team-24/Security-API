@@ -20,7 +20,7 @@ import team24.security.model.Subject;
 import team24.security.repository.ICertificateRepository;
 
 import java.math.BigInteger;
-import java.security.SecureRandom;
+import java.security.*;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -36,50 +36,16 @@ public class CertificateService {
     private ICertificateRepository certificateRepository;
     private FileKeystoreService fileKeystoreService;
     private KeystoreService keystoreService;
+    private EncryptionService encryptionService;
 
-
-
-    private Certificate create(Certificate certificate) {
-        return certificateRepository.save(certificate);
-    }
-
-    public Certificate findById(UUID uuid) {
-        return certificateRepository
-                .findById(uuid)
-                .orElseThrow(() -> new RuntimeException("Certificate doesn't exist!"));
-    }
-
-    public Certificate createRoot(CertificateRequestDto dto) {
-        BigInteger uuid = generateUniqueBigInteger()
-        Certificate cert = dto.mapToModel();
-        cert.setSerialNumber(uuid.toString());
-        cert.setIssuerSerial(uuid.toString());
-        // Find or create keystore in database
-        Keystore keystore = keystoreService.findOrCreate("root");
-        // Find or create keystore in filesystem
-        fileKeystoreService.loadKeyStore(keystore.getName());
-        // Generate certificate for file system
-
-
-
-        // Save certificate to database
-        //Return generated certificate
-        return cert;
-    }
-
-
-    private BigInteger generateUniqueBigInteger() {
-        SecureRandom random = new SecureRandom();
-        BigInteger bigInt;
-        do {
-            bigInt = new BigInteger(20, random);
-        } while (bigInt.equals(BigInteger.ZERO));
-
-        return bigInt;
-    }
-
-    public static X509Certificate generateCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber, int usage) {
+    private X509Certificate generateCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber, int usage) {
         try {
+            System.out.println(subject);
+            System.out.println(issuer);
+            System.out.println(startDate);
+            System.out.println(endDate);
+            System.out.println(usage);
+
             JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
             builder = builder.setProvider("BC");
 
@@ -113,6 +79,73 @@ public class CertificateService {
             throw new RuntimeException(e);
         }
         return null;
+    }
+
+    private Certificate create(Certificate certificate) {
+        return certificateRepository.save(certificate);
+    }
+
+    public Certificate findById(UUID uuid) {
+        return certificateRepository
+                .findById(uuid)
+                .orElseThrow(() -> new RuntimeException("Certificate doesn't exist!"));
+    }
+
+    public Certificate createRoot(CertificateRequestDto dto) {
+        //Generate applicative certificate
+        BigInteger uuid = generateUniqueBigInteger();
+        Certificate cert = dto.mapToModel();
+        cert.setKeystore("root.jks");
+        cert.setSerialNumber(uuid.toString());
+        cert.setIssuerSerial(uuid.toString());
+        int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign;
+        //TODO: validate data from issuer and for current certificate
+        //Generate bouncy castle certificate with cert data
+        X509Certificate certificate = generateCertificate(cert.toSubject(),
+                cert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
+
+        //Load everything to store
+        Keystore keystore = keystoreService.findOrCreate("root.jks");
+        String password = encryptionService.decrypt(keystore.getPassword());
+        fileKeystoreService.load("root.jks");
+        fileKeystoreService.write(certificate.getSerialNumber().toString(), cert.toIssuer().getPrivateKey(), password.toCharArray(), certificate);
+        fileKeystoreService.save("root.jks");
+
+        cert = certificateRepository.save(cert);
+        return cert;
+    }
+
+    public Certificate createIntermediary(CertificateRequestDto dto) {
+        BigInteger uuid = generateUniqueBigInteger();
+        Certificate issuerCert = certificateRepository.findOneBySerialNumber(dto.issuerId);
+        if (issuerCert == null) {
+            throw new RuntimeException("Issuer doesn't exist!");
+        }
+        Certificate cert = dto.mapToModel();
+        cert.setKeystore("intermediary.jks");
+        cert.setSerialNumber(uuid.toString());
+        int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;
+        //TODO: validate data from issuer and for current certificate
+        X509Certificate certificate = generateCertificate(cert.toSubject(),
+                issuerCert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
+
+        Keystore keystore = keystoreService.findOrCreate("intermediary.jks");
+        String password = encryptionService.decrypt(keystore.getPassword());
+        fileKeystoreService.load("intermediary.jks");
+        fileKeystoreService.write(certificate.getSerialNumber().toString(), cert.toIssuer().getPrivateKey(), password.toCharArray(), certificate);
+        fileKeystoreService.save("intermediary.jks");
+        cert = certificateRepository.save(cert);
+        return cert;
+    }
+
+    private BigInteger generateUniqueBigInteger() {
+        SecureRandom random = new SecureRandom();
+        BigInteger bigInt;
+        do {
+            bigInt = new BigInteger(20, random);
+        } while (bigInt.equals(BigInteger.ZERO));
+
+        return bigInt;
     }
 
 

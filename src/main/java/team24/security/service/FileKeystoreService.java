@@ -6,14 +6,9 @@ import org.springframework.stereotype.Service;
 import team24.security.model.Keystore;
 import team24.security.repository.IKeystoreRepository;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
+import java.io.*;
+import java.security.*;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 
 @Service
@@ -35,12 +30,26 @@ public class FileKeystoreService {
         }
     }
 
-    public void saveKeyStore(String fileName) {
+    public void findOrCreateKeystore(String fileName) {
+        System.out.println(path);
+        File file = new File(path, fileName);
+        try {
+            if (!file.exists()) {
+                file.createNewFile();
+            }
+        } catch (IOException e) {
+            // Handle the exception
+            e.printStackTrace();
+        }
+    }
+
+    public void save(String fileName) {
         try {
             Keystore store = keystoreService.findByName(fileName);
             if (store != null) {
                 char[] password = encryptionService.decrypt(store.getPassword()).toCharArray();
-                keyStore.store(new FileOutputStream(path + fileName + ".jks"), password);
+                System.out.println(path + fileName);
+                keyStore.store(new FileOutputStream(path + fileName), password);
                 return;
             }
 
@@ -51,21 +60,53 @@ public class FileKeystoreService {
         }
     }
 
-    public void loadKeyStore(String fileName) {
+    public void load(String fileName) {
         try {
             Keystore store = keystoreService.findByName(fileName);
 
-            if (store != null) {
-                char[] password = encryptionService.decrypt(store.getPassword()).toCharArray();
-                keyStore.load(new FileInputStream(fileName), password);
-                return;
+            if (store == null) {
+                store = keystoreService.create(fileName);
+            }
+            char[] password = encryptionService.decrypt(store.getPassword()).toCharArray();
+
+            if (fileExistsInDirectory(fileName)) {
+                keyStore.load(new FileInputStream(path + fileName), password);
+            } else {
+                keyStore.load(null, password);
             }
 
-            Keystore newKeystore = keystoreService.create(path);
-            char[] password = encryptionService.decrypt(newKeystore.getPassword()).toCharArray();
-            keyStore.load(null, password);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
+
+    public void write(String alias, PrivateKey privateKey, char[] password, java.security.cert.Certificate certificate) {
+        try {
+            keyStore.setKeyEntry(alias, privateKey, password, new Certificate[]{certificate});
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private boolean fileExistsInDirectory(String fileName) {
+        File directory = new File(path);
+        if (!directory.isDirectory()) {
+            // Path is not a directory
+            return false;
+        }
+        File[] files = directory.listFiles();
+        if (files == null) {
+            // Directory is empty or an I/O error occurred
+            return false;
+        }
+        for (File file : files) {
+            if (file.isFile() && file.getName().equals(fileName)) {
+                // File with given name found in directory
+                return true;
+            }
+        }
+        // File not found in directory
+        return false;
+    }
+
 }

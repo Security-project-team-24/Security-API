@@ -15,4 +15,10 @@ import java.security.PublicKey;
 public class Subject {
     private PublicKey publicKey;
     private X500Name x500Name;
+
+
+    @Override
+    public String toString() {
+        return X500Name.getDefaultStyle().toString();
+    }
 }

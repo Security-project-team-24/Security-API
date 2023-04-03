@@ -6,4 +6,5 @@ import team24.security.model.Certificate;
 import java.util.UUID;
 
 public interface ICertificateRepository extends JpaRepository<Certificate, UUID> {
+    Certificate findOneBySerialNumber(String issuerSerial);
 }
