@@ -82,6 +82,9 @@ public class CertificateService {
         int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;;
         //TODO: validate data from issuer and for current certificate
         //Generate bouncy castle certificate with cert data
+        if (!VerifyDateRange(dto.startDate, dto.endDate, cert)){
+            throw new RuntimeException("Date is not valid");
+        }
         X509Certificate certificate = generateCertificate(cert.toSubject(),
                 cert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
 
@@ -107,6 +110,9 @@ public class CertificateService {
         cert.setSerialNumber(uuid.toString());
         int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;
         //TODO: validate data from issuer and for current certificate
+        if (!VerifyDateRange(dto.startDate, dto.endDate, issuerCert)){
+            throw new RuntimeException("Date is not valid");
+        }
         X509Certificate certificate = generateCertificate(cert.toSubject(),
                 issuerCert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
 
@@ -150,5 +156,11 @@ public class CertificateService {
         } while (bigInt.equals(BigInteger.ZERO));
 
         return bigInt;
+    }
+
+    private boolean VerifyDateRange(Date from, Date to, Certificate issuerCertificate){
+        boolean isIssuerDateAfterSubjectStart = issuerCertificate.getValidFrom().after(from);
+        boolean isIssuerDateBeforeSubjectEnd = issuerCertificate.getValidTo().before(to);
+        return !isIssuerDateAfterSubjectStart && !isIssuerDateBeforeSubjectEnd;
     }
 }
