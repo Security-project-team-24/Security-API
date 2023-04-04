@@ -166,6 +166,13 @@ public class CertificateService {
         return cert;
     }
 
+    public boolean revokeCertificate(String serialNumber){
+        Certificate certificate = certificateRepository.findOneBySerialNumber(serialNumber);
+        certificate.setRevocationStatus(true);
+        certificateRepository.save(certificate);
+        return certificate.isRevocationStatus();
+    }
+
     private BigInteger generateUniqueBigInteger() {
         SecureRandom random = new SecureRandom();
         BigInteger bigInt;

@@ -1,5 +1,6 @@
 package team24.security.controller;
 
+import jakarta.websocket.server.PathParam;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,11 +31,18 @@ public class CertificateController {
         Certificate cert = certificateService.createIntermediary(dto);
         return new ResponseEntity<>(cert, HttpStatus.OK);
     }
-    @PostMapping("/endCertificate")
+    @PostMapping("/end")
     public ResponseEntity<Certificate> createEndCertificate(
             @RequestBody CertificateRequestDto dto
     ) {
         Certificate cert = certificateService.createEndCertificate(dto);
         return new ResponseEntity<>(cert, HttpStatus.OK);
     }
+
+    @PatchMapping("/{id}/revoke")
+    public ResponseEntity<Boolean> revokeCertificate(@PathVariable String id){
+        Boolean isRevoked = certificateService.revokeCertificate(id);
+        return new ResponseEntity<>(isRevoked, HttpStatus.OK);
+    }
+
 }
