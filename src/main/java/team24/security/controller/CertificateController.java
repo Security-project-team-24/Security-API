@@ -40,9 +40,9 @@ public class CertificateController {
     }
 
     @PatchMapping("/{id}/revoke")
-    public ResponseEntity<Boolean> revokeCertificate(@PathVariable String id){
-        Boolean isRevoked = certificateService.revokeCertificate(id);
-        return new ResponseEntity<>(isRevoked, HttpStatus.OK);
+    public ResponseEntity revokeCertificate(@PathVariable String id){
+        certificateService.handleRevokeCertificate(id);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
 }

@@ -25,6 +25,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import static org.bouncycastle.asn1.x500.style.RFC4519Style.serialNumber;
@@ -166,11 +167,23 @@ public class CertificateService {
         return cert;
     }
 
-    public boolean revokeCertificate(String serialNumber){
+    public void handleRevokeCertificate(String serialNumber){
+        revokeCertificate(serialNumber);
+        revokeChildren(serialNumber);
+    }
+
+    private void revokeChildren(String serialNumber){
+        List<Certificate> certificates = certificateRepository.findAllByIssuerSerial(serialNumber);
+        for(Certificate c : certificates){
+            revokeCertificate(c.getSerialNumber());
+            revokeChildren(c.getSerialNumber());
+        }
+    }
+
+    private void revokeCertificate(String serialNumber){
         Certificate certificate = certificateRepository.findOneBySerialNumber(serialNumber);
         certificate.setRevocationStatus(true);
         certificateRepository.save(certificate);
-        return certificate.isRevocationStatus();
     }
 
     private BigInteger generateUniqueBigInteger() {
