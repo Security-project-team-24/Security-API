@@ -175,6 +175,7 @@ public class CertificateService {
     private void revokeChildren(String serialNumber){
         List<Certificate> certificates = certificateRepository.findAllByIssuerSerial(serialNumber);
         for(Certificate c : certificates){
+            if(c.getSerialNumber().equals(serialNumber)) return;
             revokeCertificate(c.getSerialNumber());
             revokeChildren(c.getSerialNumber());
         }
