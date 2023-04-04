@@ -13,6 +13,7 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.springframework.stereotype.Service;
 import team24.security.dto.CertificateRequestDto;
+import team24.security.dto.RevocationDto;
 import team24.security.model.Certificate;
 import team24.security.model.Issuer;
 import team24.security.model.Keystore;
@@ -25,6 +26,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import static org.bouncycastle.asn1.x500.style.RFC4519Style.serialNumber;
@@ -164,6 +166,37 @@ public class CertificateService {
         fileKeystoreService.save("endCertificate.jks");
         cert = certificateRepository.save(cert);
         return cert;
+    }
+
+    public void handleRevokeCertificate(String serialNumber){
+        revokeCertificate(serialNumber);
+        revokeChildren(serialNumber);
+    }
+
+    public RevocationDto checkIfCertificateRevoked(String serialNumber){
+        Certificate certificate = certificateRepository.findOneBySerialNumber(serialNumber);
+        if(certificate.isRevocationStatus()) return new RevocationDto(true, certificate.getRevocationDate());
+        if(certificate.getValidTo().before(new Date())){
+            revokeCertificate(serialNumber);
+            return new RevocationDto(true, certificate.getRevocationDate());
+        }
+        return new RevocationDto(false, null);
+    }
+
+    private void revokeChildren(String serialNumber){
+        List<Certificate> certificates = certificateRepository.findAllByIssuerSerial(serialNumber);
+        for(Certificate c : certificates){
+            if(c.getSerialNumber().equals(serialNumber)) continue;
+            revokeCertificate(c.getSerialNumber());
+            revokeChildren(c.getSerialNumber());
+        }
+    }
+
+    private void revokeCertificate(String serialNumber){
+        Certificate certificate = certificateRepository.findOneBySerialNumber(serialNumber);
+        certificate.setRevocationStatus(true);
+        certificate.setRevocationDate(new Date());
+        certificateRepository.save(certificate);
     }
 
     private BigInteger generateUniqueBigInteger() {

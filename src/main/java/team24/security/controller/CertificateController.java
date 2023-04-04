@@ -1,10 +1,12 @@
 package team24.security.controller;
 
+import jakarta.websocket.server.PathParam;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import team24.security.dto.CertificateRequestDto;
+import team24.security.dto.RevocationDto;
 import team24.security.model.Certificate;
 import team24.security.service.CertificateService;
 
@@ -30,11 +32,24 @@ public class CertificateController {
         Certificate cert = certificateService.createIntermediary(dto);
         return new ResponseEntity<>(cert, HttpStatus.OK);
     }
-    @PostMapping("/endCertificate")
+    @PostMapping("/end")
     public ResponseEntity<Certificate> createEndCertificate(
             @RequestBody CertificateRequestDto dto
     ) {
         Certificate cert = certificateService.createEndCertificate(dto);
         return new ResponseEntity<>(cert, HttpStatus.OK);
     }
+
+    @PatchMapping("/{id}/revoke")
+    public ResponseEntity revokeCertificate(@PathVariable String id){
+        certificateService.handleRevokeCertificate(id);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @GetMapping("/{id}/revoke/check")
+    public ResponseEntity<RevocationDto> checkIfCertificateRevoked(@PathVariable String id){
+        RevocationDto revocation = certificateService.checkIfCertificateRevoked(id);
+        return new ResponseEntity<>(revocation, HttpStatus.OK);
+    }
+
 }
