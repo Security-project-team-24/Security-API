@@ -8,6 +8,10 @@ import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.hibernate.annotations.GenericGenerator;
 
 import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
 
@@ -49,8 +53,7 @@ public class Certificate {
     @Column(name = "revocation_date")
     private Date revocationDate;
 
-    public Subject toSubject() {
-        KeyPair keyPairSubject = generateKeyPair();
+    public Subject toSubject(PublicKey publicKey) {
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
         builder.addRDN(BCStyle.CN, this.commonName);
         builder.addRDN(BCStyle.SURNAME, this.surname);
@@ -60,11 +63,10 @@ public class Certificate {
         builder.addRDN(BCStyle.C, this.country);
         builder.addRDN(BCStyle.E, this.email);
         builder.addRDN(BCStyle.UID, this.serialNumber);
-        return new Subject(keyPairSubject.getPublic(), builder.build());
+        return new Subject(publicKey, builder.build());
     }
 
-    public Issuer toIssuer() {
-        KeyPair kp = generateKeyPair();
+    public Issuer toIssuer(PrivateKey privateKey,PublicKey publicKey) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
         builder.addRDN(BCStyle.CN, this.commonName);
         builder.addRDN(BCStyle.SURNAME, this.surname);
@@ -74,18 +76,6 @@ public class Certificate {
         builder.addRDN(BCStyle.C, this.country);
         builder.addRDN(BCStyle.E, this.email);
         builder.addRDN(BCStyle.UID, this.serialNumber);
-        return new Issuer(kp.getPrivate(), kp.getPublic(), builder.build());
-    }
-
-    private KeyPair generateKeyPair() {
-        try {
-            KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-            SecureRandom random = SecureRandom.getInstance("SHA1PRNG", "SUN");
-            keyGen.initialize(2048, random);
-            return keyGen.generateKeyPair();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+        return new Issuer(privateKey, publicKey, builder.build());
     }
 }

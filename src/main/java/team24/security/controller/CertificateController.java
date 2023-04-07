@@ -58,6 +58,11 @@ public class CertificateController {
         RevocationDto revocation = certificateService.checkIfCertificateRevoked(id);
         return new ResponseEntity<>(revocation, HttpStatus.OK);
     }
+    @GetMapping("/{id}/verify")
+    public ResponseEntity<Boolean> verifyCertificate(@PathVariable String id){
+        Boolean verifyStatus = certificateService.verifyCertificate(id);
+        return new ResponseEntity<>(verifyStatus, HttpStatus.OK);
+    }
 
     @GetMapping("/download/{id}")
     public ResponseEntity<byte[]> download(@PathVariable String id){
