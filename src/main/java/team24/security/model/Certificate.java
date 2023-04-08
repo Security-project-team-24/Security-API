@@ -1,10 +1,11 @@
 package team24.security.model;
 
 
-import jakarta.persistence.*;
+import javax.persistence.*;
 import lombok.*;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.hibernate.annotations.GenericGenerator;
 
 import java.security.*;
 import java.util.Date;
@@ -18,7 +19,8 @@ import java.util.UUID;
 @Entity(name = "certificate")
 public class Certificate {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     private UUID id;
     @Column(name = "common_name")
     private String commonName;

@@ -1,14 +1,19 @@
 package team24.security.controller;
 
-import jakarta.websocket.server.PathParam;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpClientErrorException;
 import team24.security.dto.CertificateRequestDto;
 import team24.security.dto.RevocationDto;
 import team24.security.model.Certificate;
 import team24.security.service.CertificateService;
+
+import java.security.cert.CertificateEncodingException;
+import java.util.List;
 
 @RestController
 @RequestMapping(value = "/api/certificate")
@@ -52,4 +57,27 @@ public class CertificateController {
         return new ResponseEntity<>(revocation, HttpStatus.OK);
     }
 
+    @GetMapping("/download/{id}")
+    public ResponseEntity<byte[]> download(@PathVariable String id){
+        byte[] certificateBytes = new byte[0];
+        try {
+            certificateBytes = certificateService.downloadCertificate(id);
+        } catch (CertificateEncodingException e) {
+            return ResponseEntity.internalServerError().body(certificateBytes);
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", "certificate.crt");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(certificateBytes);
+    }
+
+    @GetMapping("/findAll")
+    public ResponseEntity<List<Certificate>> findAll(){
+        List<Certificate> certificates = certificateService.findAll();
+        return new ResponseEntity<>(certificates, HttpStatus.OK);
+    }
 }
