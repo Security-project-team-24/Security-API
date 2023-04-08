@@ -1,6 +1,7 @@
 package team24.security.controller;
 
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 import team24.security.dto.CertificateRequestDto;
+import team24.security.dto.PageDto;
 import team24.security.dto.RevocationDto;
 import team24.security.model.Certificate;
 import team24.security.service.CertificateService;
@@ -75,9 +77,9 @@ public class CertificateController {
                 .body(certificateBytes);
     }
 
-    @GetMapping("/findAll")
-    public ResponseEntity<List<Certificate>> findAll(){
-        List<Certificate> certificates = certificateService.findAll();
+    @GetMapping("/findAll/{pageNumber}/{pageSize}")
+    public ResponseEntity<PageDto<Certificate>> findAll(@PathVariable int pageNumber, @PathVariable int pageSize){
+        PageDto<Certificate> certificates = certificateService.findAll(pageNumber, pageSize);
         return new ResponseEntity<>(certificates, HttpStatus.OK);
     }
 }

@@ -9,8 +9,11 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import team24.security.dto.CertificateRequestDto;
+import team24.security.dto.PageDto;
 import team24.security.dto.RevocationDto;
 import team24.security.model.Certificate;
 import team24.security.model.Issuer;
@@ -233,7 +236,8 @@ public class CertificateService {
         return cert.getEncoded();
     }
 
-    public List<Certificate> findAll(){
-        return certificateRepository.findAll();
+    public PageDto<Certificate> findAll(int pageNumber, int pageSize){
+        Page<Certificate> page = certificateRepository.findAll(PageRequest.of(pageNumber, pageSize));
+        return new PageDto<>(page.getContent(), page.getTotalPages());
     }
 }
