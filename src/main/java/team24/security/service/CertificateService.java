@@ -232,4 +232,8 @@ public class CertificateService {
         X509Certificate cert = (X509Certificate) fileKeystoreService.readCertificate(keystore.getName(), password, certificate.getSerialNumber());
         return cert.getEncoded();
     }
+
+    public List<Certificate> findAll(){
+        return certificateRepository.findAll();
+    }
 }

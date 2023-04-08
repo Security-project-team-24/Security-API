@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface ICertificateRepository extends JpaRepository<Certificate, UUID> {
     Certificate findOneBySerialNumber(String issuerSerial);
     List<Certificate> findAllByIssuerSerial(String serialNumber);
+    List<Certificate> findAll();
 }

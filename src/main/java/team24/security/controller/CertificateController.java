@@ -13,6 +13,7 @@ import team24.security.model.Certificate;
 import team24.security.service.CertificateService;
 
 import java.security.cert.CertificateEncodingException;
+import java.util.List;
 
 @RestController
 @RequestMapping(value = "/api/certificate")
@@ -72,5 +73,11 @@ public class CertificateController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(certificateBytes);
+    }
+
+    @GetMapping("/findAll")
+    public ResponseEntity<List<Certificate>> findAll(){
+        List<Certificate> certificates = certificateService.findAll();
+        return new ResponseEntity<>(certificates, HttpStatus.OK);
     }
 }
