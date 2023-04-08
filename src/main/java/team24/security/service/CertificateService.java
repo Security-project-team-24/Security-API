@@ -3,13 +3,11 @@ package team24.security.service;
 import lombok.AllArgsConstructor;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyUsage;
-import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
-import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.springframework.stereotype.Service;
 import team24.security.dto.CertificateRequestDto;
@@ -20,6 +18,9 @@ import team24.security.model.Keystore;
 import team24.security.model.Subject;
 import team24.security.repository.ICertificateRepository;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.CertificateEncodingException;
@@ -223,5 +224,12 @@ public class CertificateService {
 
         return tmp[5];
     }
-    
+
+    public byte[] downloadCertificate(String id) throws CertificateEncodingException {
+        Certificate certificate = certificateRepository.findOneBySerialNumber(id);
+        Keystore keystore = keystoreService.findByName(certificate.getKeystore());
+        String password = encryptionService.decrypt(keystore.getPassword());
+        X509Certificate cert = (X509Certificate) fileKeystoreService.readCertificate(keystore.getName(), password, certificate.getSerialNumber());
+        return cert.getEncoded();
+    }
 }
