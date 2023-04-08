@@ -236,4 +236,7 @@ public class CertificateService {
     public List<Certificate> findAll(){
         return certificateRepository.findAll();
     }
+    public List<Certificate> findIssuers(){
+        return this.certificateRepository.findAllCAs();
+    }
 }
