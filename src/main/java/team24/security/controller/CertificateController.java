@@ -16,7 +16,7 @@ import team24.security.service.CertificateService;
 
 import java.security.cert.CertificateEncodingException;
 import java.util.List;
-
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping(value = "/api/certificate")
 @AllArgsConstructor
@@ -80,6 +80,12 @@ public class CertificateController {
     @GetMapping("/findAll/{pageNumber}/{pageSize}")
     public ResponseEntity<PageDto<Certificate>> findAll(@PathVariable int pageNumber, @PathVariable int pageSize){
         PageDto<Certificate> certificates = certificateService.findAll(pageNumber, pageSize);
+        return new ResponseEntity<>(certificates, HttpStatus.OK);
+    }
+
+    @GetMapping("/issuer")
+    public ResponseEntity<List<Certificate>> findIssuers(){
+        List<Certificate> certificates = certificateService.findIssuers();
         return new ResponseEntity<>(certificates, HttpStatus.OK);
     }
 }

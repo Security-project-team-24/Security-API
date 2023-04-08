@@ -240,4 +240,7 @@ public class CertificateService {
         Page<Certificate> page = certificateRepository.findAll(PageRequest.of(pageNumber, pageSize));
         return new PageDto<>(page.getContent(), page.getTotalPages());
     }
+    public List<Certificate> findIssuers(){
+        return this.certificateRepository.findAllCAs();
+    }
 }
