@@ -30,6 +30,7 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.security.*;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -214,17 +215,14 @@ public class CertificateService {
         }
         return null;
     }
-    public Boolean verifyCertificate(String serialNumber){
-        Certificate certificate = certificateRepository.findOneBySerialNumber(serialNumber);
-        Certificate issuerCertificate = certificateRepository.findOneBySerialNumber(certificate.getIssuerSerial());
-        Keystore subjectKeyStore = this.keystoreService.findByName(certificate.getKeystore());
+    public Boolean verifyCertificate(X509Certificate certificate){
+        Certificate subjectCertificate = certificateRepository.findOneBySerialNumber(String.valueOf(certificate.getSerialNumber()));
+        Certificate issuerCertificate = certificateRepository.findOneBySerialNumber(subjectCertificate.getIssuerSerial());
         Keystore issuerKeyStore = this.keystoreService.findByName(issuerCertificate.getKeystore());
-        String subjectKeystoreDecodedPassword = encryptionService.decrypt(subjectKeyStore.getPassword());
         String issuerKeystoreDecodedPassword = encryptionService.decrypt(issuerKeyStore.getPassword());
-        X509Certificate realCertificate = (X509Certificate)fileKeystoreService.readCertificate(certificate.getKeystore(),subjectKeystoreDecodedPassword,certificate.getSerialNumber().toString());
         PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCertificate.getKeystore(),issuerKeystoreDecodedPassword,issuerCertificate.getSerialNumber().toString()).getPublicKey();
         try {
-            realCertificate.verify(issuerPublicKey);
+            certificate.verify(issuerPublicKey);
         } catch (Exception e) {
             return false;
         }
