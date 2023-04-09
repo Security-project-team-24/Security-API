@@ -23,6 +23,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.List;
+
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping(value = "/api/certificate")
@@ -83,13 +84,18 @@ public class CertificateController {
                 .headers(headers)
                 .body(certificateBytes);
     }
-    @PostMapping("/verify-certificate")
-    public ResponseEntity<Boolean> uploadFile(@RequestParam("file") MultipartFile file) throws CertificateException, IOException {
-        InputStream inputStream = file.getInputStream();
-        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-        X509Certificate certificate = (X509Certificate) certificateFactory.generateCertificate(inputStream);
-        System.out.println(certificate.getSerialNumber());
-        Boolean isCertificateValid = certificateService.verifyCertificate(certificate);
+    @PostMapping(value = "/verify")
+    public ResponseEntity<Boolean> uploadFile(@RequestParam("file") MultipartFile file) {
+        InputStream inputStream = null;
+        try {
+            inputStream = file.getInputStream();
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+            X509Certificate certificate = (X509Certificate) certificateFactory.generateCertificate(inputStream);
+            System.out.println(certificate.getSerialNumber());
+            Boolean isCertificateValid = certificateService.verifyCertificate(certificate);
+        } catch (Exception e) {
+            return new ResponseEntity<>(false, HttpStatus.OK);
+        }
         return new ResponseEntity<>(true, HttpStatus.OK);
     }
 
