@@ -1,8 +1,10 @@
 package team24.security.exceptions;
 
-class CertificateGenerationFailedException extends RuntimeException {
+import org.springframework.http.HttpStatus;
 
-    CertificateGenerationFailedException() {
-        super("Certificate generation failed!");
+public class CertificateGenerationFailedException extends BaseException {
+
+    public CertificateGenerationFailedException() {
+        super("Certificate generation failed!", HttpStatus.BAD_REQUEST);
     }
 }

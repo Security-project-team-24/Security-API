@@ -15,6 +15,9 @@ import org.springframework.stereotype.Service;
 import team24.security.dto.CertificateRequestDto;
 import team24.security.dto.PageDto;
 import team24.security.dto.RevocationDto;
+import team24.security.exceptions.CertificateDateNotValidException;
+import team24.security.exceptions.IssuerRevokedException;
+import team24.security.exceptions.NoPermissionToGenerateCertificateException;
 import team24.security.model.Certificate;
 import team24.security.model.Issuer;
 import team24.security.model.Keystore;
@@ -58,7 +61,7 @@ public class CertificateService {
                     subject.getPublicKey());
 
             certGen.addExtension(Extension.keyUsage, false, new KeyUsage(usage));
-            
+
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
             certConverter = certConverter.setProvider("BC");
@@ -69,9 +72,11 @@ public class CertificateService {
         }
         return null;
     }
+
     private Certificate create(Certificate certificate) {
         return certificateRepository.save(certificate);
     }
+
     public Certificate findById(UUID uuid) {
         return certificateRepository
                 .findById(uuid)
@@ -86,11 +91,12 @@ public class CertificateService {
         cert.setKeystore("root.jks");
         cert.setSerialNumber(uuid.toString());
         cert.setIssuerSerial(uuid.toString());
-        int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;;
+        int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;
+        ;
         //TODO: validate data from issuer and for current certificate
         //Generate bouncy castle certificate with cert data
-        if (!verifyDateRange(dto.startDate, dto.endDate, cert)){
-            throw new RuntimeException("Date is not valid");
+        if (!verifyDateRange(dto.startDate, dto.endDate, cert)) {
+            throw new CertificateDateNotValidException();
         }
         X509Certificate certificate = generateCertificate(cert.toSubject(),
                 cert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
@@ -118,14 +124,14 @@ public class CertificateService {
         cert.setSerialNumber(uuid.toString());
         int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;
         //TODO: validate data from issuer and for current certificate
-        if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)){
-            throw new RuntimeException("Date is not valid");
+        if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)) {
+            throw new CertificateDateNotValidException();
         }
-        if (!verifyUsage(issuerCert)){
-            throw new RuntimeException("Issuer cannot generate");
+        if (!verifyUsage(issuerCert)) {
+            throw new NoPermissionToGenerateCertificateException();
         }
-        if (issuerCert.isRevocationStatus()){
-            throw new RuntimeException("Issuer is revoked");
+        if (issuerCert.isRevocationStatus()) {
+            throw new IssuerRevokedException();
         }
         X509Certificate certificate = generateCertificate(cert.toSubject(),
                 issuerCert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
@@ -149,16 +155,16 @@ public class CertificateService {
         cert.setRevocationStatus(false);
         cert.setKeystore("endCertificate.jks");
         cert.setSerialNumber(uuid.toString());
-        int usage =  KeyUsage.digitalSignature;
+        int usage = KeyUsage.digitalSignature;
         //TODO: validate data from issuer and for current certificate
-        if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)){
-            throw new RuntimeException("Date is not valid");
+        if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)) {
+            throw new CertificateDateNotValidException();
         }
-        if (!verifyUsage(issuerCert)){
-            throw new RuntimeException("Issuer cannot generate");
+        if (!verifyUsage(issuerCert)) {
+            throw new NoPermissionToGenerateCertificateException();
         }
-        if (issuerCert.isRevocationStatus()){
-            throw new RuntimeException("Issuer is revoked");
+        if (issuerCert.isRevocationStatus()) {
+            throw new IssuerRevokedException();
         }
         X509Certificate certificate = generateCertificate(cert.toSubject(),
                 issuerCert.toIssuer(), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage);
@@ -172,31 +178,31 @@ public class CertificateService {
         return cert;
     }
 
-    public void handleRevokeCertificate(String serialNumber){
+    public void handleRevokeCertificate(String serialNumber) {
         revokeCertificate(serialNumber);
         revokeChildren(serialNumber);
     }
 
-    public RevocationDto checkIfCertificateRevoked(String serialNumber){
+    public RevocationDto checkIfCertificateRevoked(String serialNumber) {
         Certificate certificate = certificateRepository.findOneBySerialNumber(serialNumber);
-        if(certificate.isRevocationStatus()) return new RevocationDto(true, certificate.getRevocationDate());
-        if(certificate.getValidTo().before(new Date())){
+        if (certificate.isRevocationStatus()) return new RevocationDto(true, certificate.getRevocationDate());
+        if (certificate.getValidTo().before(new Date())) {
             revokeCertificate(serialNumber);
             return new RevocationDto(true, certificate.getRevocationDate());
         }
         return new RevocationDto(false, null);
     }
 
-    private void revokeChildren(String serialNumber){
+    private void revokeChildren(String serialNumber) {
         List<Certificate> certificates = certificateRepository.findAllByIssuerSerial(serialNumber);
-        for(Certificate c : certificates){
-            if(c.getSerialNumber().equals(serialNumber)) continue;
+        for (Certificate c : certificates) {
+            if (c.getSerialNumber().equals(serialNumber)) continue;
             revokeCertificate(c.getSerialNumber());
             revokeChildren(c.getSerialNumber());
         }
     }
 
-    private void revokeCertificate(String serialNumber){
+    private void revokeCertificate(String serialNumber) {
         Certificate certificate = certificateRepository.findOneBySerialNumber(serialNumber);
         certificate.setRevocationStatus(true);
         certificate.setRevocationDate(new Date());
@@ -213,16 +219,16 @@ public class CertificateService {
         return bigInt;
     }
 
-    private boolean verifyDateRange(Date from, Date to, Certificate issuerCertificate){
+    private boolean verifyDateRange(Date from, Date to, Certificate issuerCertificate) {
         boolean isIssuerDateAfterSubjectStart = issuerCertificate.getValidFrom().after(from);
         boolean isIssuerDateBeforeSubjectEnd = issuerCertificate.getValidTo().before(to);
         return !isIssuerDateAfterSubjectStart && !isIssuerDateBeforeSubjectEnd;
     }
 
-    private boolean verifyUsage(Certificate issuerCertificate){
+    private boolean verifyUsage(Certificate issuerCertificate) {
         Keystore keystore = keystoreService.findByName(issuerCertificate.getKeystore());
         String password = encryptionService.decrypt(keystore.getPassword());
-        X509Certificate cert = (X509Certificate)fileKeystoreService.readCertificate(keystore.getName(), password, issuerCertificate.getSerialNumber());
+        X509Certificate cert = (X509Certificate) fileKeystoreService.readCertificate(keystore.getName(), password, issuerCertificate.getSerialNumber());
         boolean[] tmp = cert.getKeyUsage();
 
         return tmp[5];
@@ -236,11 +242,12 @@ public class CertificateService {
         return cert.getEncoded();
     }
 
-    public PageDto<Certificate> findAll(int pageNumber, int pageSize){
+    public PageDto<Certificate> findAll(int pageNumber, int pageSize) {
         Page<Certificate> page = certificateRepository.findAll(PageRequest.of(pageNumber, pageSize));
         return new PageDto<>(page.getContent(), page.getTotalPages());
     }
-    public List<Certificate> findIssuers(){
+
+    public List<Certificate> findIssuers() {
         return this.certificateRepository.findAllCAs();
     }
 }
