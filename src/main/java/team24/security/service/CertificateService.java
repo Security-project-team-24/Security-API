@@ -16,9 +16,7 @@ import org.springframework.stereotype.Service;
 import team24.security.dto.CertificateRequestDto;
 import team24.security.dto.PageDto;
 import team24.security.dto.RevocationDto;
-import team24.security.exceptions.CertificateDateNotValidException;
-import team24.security.exceptions.IssuerRevokedException;
-import team24.security.exceptions.NoPermissionToGenerateCertificateException;
+import team24.security.exceptions.*;
 import team24.security.model.Certificate;
 import team24.security.model.Issuer;
 import team24.security.model.Keystore;
@@ -215,18 +213,28 @@ public class CertificateService {
         }
         return null;
     }
-    public Boolean verifyCertificate(X509Certificate certificate){
-        Certificate subjectCertificate = certificateRepository.findOneBySerialNumber(String.valueOf(certificate.getSerialNumber()));
-        Certificate issuerCertificate = certificateRepository.findOneBySerialNumber(subjectCertificate.getIssuerSerial());
-        Keystore issuerKeyStore = this.keystoreService.findByName(issuerCertificate.getKeystore());
-        String issuerKeystoreDecodedPassword = encryptionService.decrypt(issuerKeyStore.getPassword());
-        PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCertificate.getKeystore(),issuerKeystoreDecodedPassword,issuerCertificate.getSerialNumber().toString()).getPublicKey();
+    public void verifyCertificate(X509Certificate certificate){
+            Certificate subjectCertificate = certificateRepository.findOneBySerialNumber(String.valueOf(certificate.getSerialNumber()));
+            if (subjectCertificate == null) throw new CertificateNotFoundException();
+            if (subjectCertificate.isRevocationStatus()) throw new IssuerRevokedException();
+            Certificate issuerCertificate = certificateRepository.findOneBySerialNumber(subjectCertificate.getIssuerSerial());
+            if (issuerCertificate == null) throw new CertificateNotFoundException();
+            Keystore issuerKeyStore = this.keystoreService.findByName(issuerCertificate.getKeystore());
+            String issuerKeystoreDecodedPassword = encryptionService.decrypt(issuerKeyStore.getPassword());
+            PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCertificate.getKeystore(),issuerKeystoreDecodedPassword,issuerCertificate.getSerialNumber().toString()).getPublicKey();
         try {
-            certificate.verify(issuerPublicKey);
-        } catch (Exception e) {
-            return false;
+            certificate.verify(certificate.getPublicKey());
+        } catch (CertificateException e) {
+            throw new VerificationFailedException();
+        } catch (NoSuchAlgorithmException e) {
+            throw new VerificationFailedException();
+        } catch (InvalidKeyException e) {
+            throw new VerificationFailedException();
+        } catch (NoSuchProviderException e) {
+            throw new VerificationFailedException();
+        } catch (SignatureException e) {
+            throw new VerificationFailedException();
         }
-        return true;
     }
 
     public void handleRevokeCertificate(String serialNumber) {

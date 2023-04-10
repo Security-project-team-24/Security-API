@@ -87,16 +87,16 @@ public class CertificateController {
     @PostMapping(value = "/verify")
     public ResponseEntity<Boolean> uploadFile(@RequestParam("file") MultipartFile file) {
         InputStream inputStream = null;
+        X509Certificate certificate;
         try {
             inputStream = file.getInputStream();
             CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-            X509Certificate certificate = (X509Certificate) certificateFactory.generateCertificate(inputStream);
-            System.out.println(certificate.getSerialNumber());
-            Boolean isCertificateValid = certificateService.verifyCertificate(certificate);
+            certificate = (X509Certificate) certificateFactory.generateCertificate(inputStream);
         } catch (Exception e) {
             return new ResponseEntity<>(false, HttpStatus.OK);
         }
-        return new ResponseEntity<>(true, HttpStatus.OK);
+        certificateService.verifyCertificate(certificate);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @GetMapping("/findAll/{pageNumber}/{pageSize}")
