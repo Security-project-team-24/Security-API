@@ -223,7 +223,7 @@ public class CertificateService {
             String issuerKeystoreDecodedPassword = encryptionService.decrypt(issuerKeyStore.getPassword());
             PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCertificate.getKeystore(),issuerKeystoreDecodedPassword,issuerCertificate.getSerialNumber().toString()).getPublicKey();
         try {
-            certificate.verify(certificate.getPublicKey());
+            certificate.verify(issuerPublicKey);
         } catch (CertificateException e) {
             throw new VerificationFailedException();
         } catch (NoSuchAlgorithmException e) {
