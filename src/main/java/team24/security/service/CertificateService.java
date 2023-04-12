@@ -7,6 +7,7 @@ import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
@@ -14,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import team24.security.dto.CertificateRequestDto;
+import team24.security.dto.KeyUsageDto;
 import team24.security.dto.PageDto;
 import team24.security.dto.RevocationDto;
 import team24.security.exceptions.*;
@@ -23,16 +25,15 @@ import team24.security.model.Keystore;
 import team24.security.model.Subject;
 import team24.security.repository.ICertificateRepository;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @AllArgsConstructor
@@ -55,9 +56,12 @@ public class CertificateService {
                     endDate,
                     subject.getX500Name(),
                     subject.getPublicKey());
-
-            certGen.addExtension(Extension.basicConstraints, true, new BasicConstraints(isCA));
+            
+            JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
+            certGen.addExtension(Extension.basicConstraints,true,new BasicConstraints(isCA));
             certGen.addExtension(Extension.keyUsage, true, new KeyUsage(usage));
+            certGen.addExtension(Extension.subjectKeyIdentifier, true, extUtils.createSubjectKeyIdentifier(subject.getPublicKey()));
+            certGen.addExtension(Extension.authorityKeyIdentifier, true, extUtils.createAuthorityKeyIdentifier(issuer.getPublicKey()));
 
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
@@ -105,10 +109,11 @@ public class CertificateService {
         cert.setSerialNumber(uuid.toString());
         cert.setIssuerSerial(uuid.toString());
         KeyPair keyPair = generateKeyPair();
-        int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;
+        int usage = getUsage(dto.getExtensions(),null);
+        usage = usage | KeyUsage.digitalSignature | KeyUsage.keyCertSign;
         //TODO: validate data from issuer and for current certificate
         //Generate bouncy castle certificate with cert data
-        if (!verifyDateRange(dto.startDate, dto.endDate, cert)) {
+        if (!verifyDateRange(dto.getStartDate(), dto.getEndDate(), cert)) {
             throw new CertificateDateNotValidException();
         }
         X509Certificate certificate = null;
@@ -130,28 +135,71 @@ public class CertificateService {
         return cert;
     }
 
+    private static int getUsage(KeyUsageDto extensions, boolean[] issuerKeyUsage) {
+        int usage = 0;
+        
+        if(extensions.getCRLSign()){
+            if(issuerKeyUsage != null) {
+                boolean isIssuerCRLSignEnabled = issuerKeyUsage[6];
+                if (!isIssuerCRLSignEnabled) throw new CreateCertificateExtensionsException();
+            }
+            usage = usage | KeyUsage.cRLSign;
+        }
+        
+        if(extensions.getKeyEncipherment()){
+            if(issuerKeyUsage != null) {
+                boolean isIssuerKeyEnciphermentEnabled = issuerKeyUsage[2];
+                if (!isIssuerKeyEnciphermentEnabled) throw new CreateCertificateExtensionsException();
+            }
+            usage = usage | KeyUsage.keyEncipherment;
+        }
+        
+        if(extensions.getNonRepudiation()){
+            if(issuerKeyUsage != null) {
+                boolean isIssuerNonRepudiationEnabled = issuerKeyUsage[1];
+                if (!isIssuerNonRepudiationEnabled) throw new CreateCertificateExtensionsException();
+            }
+            usage = usage | KeyUsage.nonRepudiation;
+        }
+        
+        if(extensions.getDataEncipherment()){
+            if(issuerKeyUsage != null){
+                boolean isIssuerDataEnciphermentEnabled = issuerKeyUsage[3];
+                if(!isIssuerDataEnciphermentEnabled) throw new CreateCertificateExtensionsException();
+            }
+            usage = usage | KeyUsage.dataEncipherment;
+        }
+        
+        return usage;
+    }
+
     public Certificate createIntermediary(CertificateRequestDto dto) {
         BigInteger uuid = generateUniqueBigInteger();
-        Certificate issuerCert = certificateRepository.findOneBySerialNumber(dto.issuerId);
+        Certificate issuerCert = certificateRepository.findOneBySerialNumber(dto.getIssuerId());
         if (issuerCert == null) {
             throw new RuntimeException("Issuer doesn't exist!");
         }
         Keystore issuerKeystore = this.keystoreService.findByName(issuerCert.getKeystore());
         String decodedPassword = encryptionService.decrypt(issuerKeystore.getPassword());
-        PrivateKey issuerPrivateKey = fileKeystoreService.readPrivateKeyFromIssuer(issuerCert.getKeystore(), decodedPassword, issuerCert.getSerialNumber());
-        PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCert.getKeystore(), decodedPassword, issuerCert.getSerialNumber()).getPublicKey();
+        PrivateKey issuerPrivateKey = fileKeystoreService.readPrivateKeyFromIssuer(issuerCert.getKeystore(),decodedPassword,issuerCert.getSerialNumber());
+        X509Certificate issuerCertificate = (X509Certificate) fileKeystoreService.readCertificate(issuerCert.getKeystore(),decodedPassword,issuerCert.getSerialNumber());
         Certificate cert = dto.mapToModel();
         cert.setRevocationStatus(false);
         cert.setKeystore("intermediary.jks");
         cert.setSerialNumber(uuid.toString());
         KeyPair keyPair = generateKeyPair();
-        int usage = KeyUsage.cRLSign | KeyUsage.keyCertSign | KeyUsage.digitalSignature;
-        //TODO: validate data from issuer and for current certificate
-        if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)) {
-            throw new CertificateDateNotValidException();
-        }
+        
+        boolean isIssuerCA = issuerCertificate.getBasicConstraints() > 0;
+        if(!isIssuerCA) throw new NoPermissionToGenerateCertificateException();
         if (!verifyUsage(issuerCert)) {
             throw new NoPermissionToGenerateCertificateException();
+        }
+        boolean[] issuerKeyUsage = issuerCertificate.getKeyUsage();
+        int usage = getUsage(dto.getExtensions(),issuerKeyUsage);
+        usage = usage | KeyUsage.digitalSignature | KeyUsage.keyCertSign;
+        //TODO: validate data from issuer and for current certificate
+        if (!verifyDateRange(dto.getStartDate(), dto.getEndDate(), issuerCert)) {
+            throw new CertificateDateNotValidException();
         }
         if (issuerCert.isRevocationStatus()) {
             throw new IssuerRevokedException();
@@ -159,7 +207,7 @@ public class CertificateService {
         X509Certificate certificate = null;
         try {
             certificate = generateCertificate(cert.toSubject(keyPair.getPublic()),
-                    issuerCert.toIssuer(issuerPrivateKey, issuerPublicKey), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, true);
+                    issuerCert.toIssuer(issuerPrivateKey,issuerCertificate.getPublicKey()), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, true);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -175,26 +223,33 @@ public class CertificateService {
 
     public Certificate createEndCertificate(CertificateRequestDto dto) {
         BigInteger uuid = generateUniqueBigInteger();
-        Certificate issuerCert = certificateRepository.findOneBySerialNumber(dto.issuerId);
+        Certificate issuerCert = certificateRepository.findOneBySerialNumber(dto.getIssuerId());
         if (issuerCert == null) {
             throw new RuntimeException("Issuer doesn't exist!");
         }
         Keystore issuerKeystore = this.keystoreService.findByName(issuerCert.getKeystore());
         String decodedPassword = encryptionService.decrypt(issuerKeystore.getPassword());
-        PrivateKey issuerPrivateKey = fileKeystoreService.readPrivateKeyFromIssuer(issuerCert.getKeystore(), decodedPassword, issuerCert.getSerialNumber());
-        PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCert.getKeystore(), decodedPassword, issuerCert.getSerialNumber()).getPublicKey();
+        PrivateKey issuerPrivateKey = fileKeystoreService.readPrivateKeyFromIssuer(issuerCert.getKeystore(),decodedPassword,issuerCert.getSerialNumber());
+        X509Certificate issuerCertificate = (X509Certificate) fileKeystoreService.readCertificate(issuerCert.getKeystore(),decodedPassword,issuerCert.getSerialNumber());
         Certificate cert = dto.mapToModel();
         cert.setRevocationStatus(false);
         cert.setKeystore("endCertificate.jks");
         cert.setSerialNumber(uuid.toString());
         KeyPair keyPair = generateKeyPair();
-        int usage = KeyUsage.digitalSignature;
-        //TODO: validate data from issuer and for current certificate
-        if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)) {
-            throw new CertificateDateNotValidException();
-        }
+
+        boolean isIssuerCA = issuerCertificate.getBasicConstraints() == 1;
+        if(!isIssuerCA) throw new NoPermissionToGenerateCertificateException();
         if (!verifyUsage(issuerCert)) {
             throw new NoPermissionToGenerateCertificateException();
+        }
+
+        boolean[] issuerKeyUsage = issuerCertificate.getKeyUsage();
+        int usage = getUsage(dto.getExtensions(),issuerKeyUsage);
+        usage = usage | KeyUsage.digitalSignature;
+        
+        //TODO: validate data from issuer and for current certificate
+        if (!verifyDateRange(dto.getStartDate(), dto.getEndDate(), issuerCert)) {
+            throw new CertificateDateNotValidException();
         }
         if (issuerCert.isRevocationStatus()) {
             throw new IssuerRevokedException();
@@ -202,7 +257,7 @@ public class CertificateService {
         X509Certificate certificate = null;
         try {
             certificate = generateCertificate(cert.toSubject(keyPair.getPublic()),
-                    issuerCert.toIssuer(issuerPrivateKey, issuerPublicKey), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, false);
+                    issuerCert.toIssuer(issuerPrivateKey, issuerCertificate.getPublicKey()), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

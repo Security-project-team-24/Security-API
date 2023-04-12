@@ -7,17 +7,17 @@ import lombok.Setter;
 import team24.security.model.Certificate;
 
 import java.util.Date;
-import java.util.UUID;
 
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 public class CertificateRequestDto {
-    public SubjectDto subject;
-    public String issuerId;
-    public Date startDate;
-    public Date endDate;
+    SubjectDto subject;
+    String issuerId;
+    Date startDate;
+    Date endDate;
+    KeyUsageDto extensions;
 
 
     public Certificate mapToModel() {

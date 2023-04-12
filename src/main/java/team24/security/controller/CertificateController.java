@@ -39,7 +39,6 @@ public class CertificateController {
         return new ResponseEntity<>(cert, HttpStatus.OK);
     }
 
-
     @PostMapping("/intermediary")
     public ResponseEntity<Certificate> createIntermediary(
             @RequestBody CertificateRequestDto dto

@@ -10,11 +10,11 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class SubjectDto {
-    public String commonName;
-    public String surname;
-    public String givenName;
-    public String organization;
-    public String organizationUnit;
-    public String country;
-    public String email;
+    String commonName;
+    String surname;
+    String givenName;
+    String organization;
+    String organizationUnit;
+    String country;
+    String email;
 }
