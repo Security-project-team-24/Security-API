@@ -32,10 +32,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @AllArgsConstructor
@@ -46,11 +43,11 @@ public class CertificateService {
     private KeystoreService keystoreService;
     private EncryptionService encryptionService;
 
-    private X509Certificate generateCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber, int usage,boolean isCA) {
+    private X509Certificate generateCertificate(Subject subject, Issuer issuer, Date startDate, Date endDate, String serialNumber, int usage, boolean isCA) {
         try {
             JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
             builder = builder.setProvider("BC");
-            
+
             ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
             X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
                     new BigInteger(serialNumber),
@@ -58,10 +55,10 @@ public class CertificateService {
                     endDate,
                     subject.getX500Name(),
                     subject.getPublicKey());
-            
-            certGen.addExtension(Extension.basicConstraints,true,new BasicConstraints(isCA));
+
+            certGen.addExtension(Extension.basicConstraints, true, new BasicConstraints(isCA));
             certGen.addExtension(Extension.keyUsage, true, new KeyUsage(usage));
-            
+
             X509CertificateHolder certHolder = certGen.build(contentSigner);
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
             certConverter = certConverter.setProvider("BC");
@@ -83,6 +80,23 @@ public class CertificateService {
                 .orElseThrow(() -> new RuntimeException("Certificate doesn't exist!"));
     }
 
+    public List<Certificate> findCertificateChain(String serialNumber) {
+        return findCertificateChildren(serialNumber);
+    }
+
+    private List<Certificate> findCertificateChildren(String serial) {
+        List<Certificate> certificates = this.certificateRepository.findAllByIssuerSerial(serial);
+        List<Certificate> children = new ArrayList<>();
+        for (Certificate c : certificates) {
+            System.out.println(serial + " " + c.getSerialNumber());
+            if (serial.equals(c.getSerialNumber())) continue;
+            children.add(c);
+            children.addAll(findCertificateChildren(c.getSerialNumber()));
+        }
+        return children;
+    }
+
+
     public Certificate createRoot(CertificateRequestDto dto) {
         //Generate applicative certificate
         BigInteger uuid = generateUniqueBigInteger();
@@ -101,7 +115,7 @@ public class CertificateService {
         X509Certificate certificate = null;
         try {
             certificate = generateCertificate(cert.toSubject(keyPair.getPublic()),
-                    cert.toIssuer(keyPair.getPrivate(),keyPair.getPublic()), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, true);
+                    cert.toIssuer(keyPair.getPrivate(), keyPair.getPublic()), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, true);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -125,8 +139,8 @@ public class CertificateService {
         }
         Keystore issuerKeystore = this.keystoreService.findByName(issuerCert.getKeystore());
         String decodedPassword = encryptionService.decrypt(issuerKeystore.getPassword());
-        PrivateKey issuerPrivateKey = fileKeystoreService.readPrivateKeyFromIssuer(issuerCert.getKeystore(),decodedPassword,issuerCert.getSerialNumber());
-        PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCert.getKeystore(),decodedPassword,issuerCert.getSerialNumber()).getPublicKey();
+        PrivateKey issuerPrivateKey = fileKeystoreService.readPrivateKeyFromIssuer(issuerCert.getKeystore(), decodedPassword, issuerCert.getSerialNumber());
+        PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCert.getKeystore(), decodedPassword, issuerCert.getSerialNumber()).getPublicKey();
         Certificate cert = dto.mapToModel();
         cert.setRevocationStatus(false);
         cert.setKeystore("intermediary.jks");
@@ -146,15 +160,15 @@ public class CertificateService {
         X509Certificate certificate = null;
         try {
             certificate = generateCertificate(cert.toSubject(keyPair.getPublic()),
-                    issuerCert.toIssuer(issuerPrivateKey,issuerPublicKey), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, true);
+                    issuerCert.toIssuer(issuerPrivateKey, issuerPublicKey), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, true);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        } 
+        }
 
         Keystore keystore = keystoreService.findOrCreate("intermediary.jks");
         String password = encryptionService.decrypt(keystore.getPassword());
         fileKeystoreService.load("intermediary.jks");
-        fileKeystoreService.write(certificate.getSerialNumber().toString(),keyPair.getPrivate(), password.toCharArray(), certificate);
+        fileKeystoreService.write(certificate.getSerialNumber().toString(), keyPair.getPrivate(), password.toCharArray(), certificate);
         fileKeystoreService.save("intermediary.jks");
         cert = certificateRepository.save(cert);
         return cert;
@@ -168,14 +182,14 @@ public class CertificateService {
         }
         Keystore issuerKeystore = this.keystoreService.findByName(issuerCert.getKeystore());
         String decodedPassword = encryptionService.decrypt(issuerKeystore.getPassword());
-        PrivateKey issuerPrivateKey = fileKeystoreService.readPrivateKeyFromIssuer(issuerCert.getKeystore(),decodedPassword,issuerCert.getSerialNumber());
-        PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCert.getKeystore(),decodedPassword,issuerCert.getSerialNumber()).getPublicKey();
+        PrivateKey issuerPrivateKey = fileKeystoreService.readPrivateKeyFromIssuer(issuerCert.getKeystore(), decodedPassword, issuerCert.getSerialNumber());
+        PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCert.getKeystore(), decodedPassword, issuerCert.getSerialNumber()).getPublicKey();
         Certificate cert = dto.mapToModel();
         cert.setRevocationStatus(false);
         cert.setKeystore("endCertificate.jks");
         cert.setSerialNumber(uuid.toString());
         KeyPair keyPair = generateKeyPair();
-        int usage =  KeyUsage.digitalSignature;
+        int usage = KeyUsage.digitalSignature;
         //TODO: validate data from issuer and for current certificate
         if (!verifyDateRange(dto.startDate, dto.endDate, issuerCert)) {
             throw new CertificateDateNotValidException();
@@ -189,7 +203,7 @@ public class CertificateService {
         X509Certificate certificate = null;
         try {
             certificate = generateCertificate(cert.toSubject(keyPair.getPublic()),
-                    issuerCert.toIssuer(issuerPrivateKey,issuerPublicKey), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, false);
+                    issuerCert.toIssuer(issuerPrivateKey, issuerPublicKey), cert.getValidFrom(), cert.getValidTo(), cert.getSerialNumber(), usage, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -202,6 +216,7 @@ public class CertificateService {
         cert = certificateRepository.save(cert);
         return cert;
     }
+
     private KeyPair generateKeyPair() {
         try {
             KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
@@ -213,15 +228,16 @@ public class CertificateService {
         }
         return null;
     }
-    public void verifyCertificate(X509Certificate certificate){
-            Certificate subjectCertificate = certificateRepository.findOneBySerialNumber(String.valueOf(certificate.getSerialNumber()));
-            if (subjectCertificate == null) throw new CertificateNotFoundException();
-            if (subjectCertificate.isRevocationStatus()) throw new IssuerRevokedException();
-            Certificate issuerCertificate = certificateRepository.findOneBySerialNumber(subjectCertificate.getIssuerSerial());
-            if (issuerCertificate == null) throw new CertificateNotFoundException();
-            Keystore issuerKeyStore = this.keystoreService.findByName(issuerCertificate.getKeystore());
-            String issuerKeystoreDecodedPassword = encryptionService.decrypt(issuerKeyStore.getPassword());
-            PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCertificate.getKeystore(),issuerKeystoreDecodedPassword,issuerCertificate.getSerialNumber().toString()).getPublicKey();
+
+    public void verifyCertificate(X509Certificate certificate) {
+        Certificate subjectCertificate = certificateRepository.findOneBySerialNumber(String.valueOf(certificate.getSerialNumber()));
+        if (subjectCertificate == null) throw new CertificateNotFoundException();
+        if (subjectCertificate.isRevocationStatus()) throw new IssuerRevokedException();
+        Certificate issuerCertificate = certificateRepository.findOneBySerialNumber(subjectCertificate.getIssuerSerial());
+        if (issuerCertificate == null) throw new CertificateNotFoundException();
+        Keystore issuerKeyStore = this.keystoreService.findByName(issuerCertificate.getKeystore());
+        String issuerKeystoreDecodedPassword = encryptionService.decrypt(issuerKeyStore.getPassword());
+        PublicKey issuerPublicKey = fileKeystoreService.readCertificate(issuerCertificate.getKeystore(), issuerKeystoreDecodedPassword, issuerCertificate.getSerialNumber().toString()).getPublicKey();
         try {
             certificate.verify(issuerPublicKey);
         } catch (CertificateException e) {

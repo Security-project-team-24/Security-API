@@ -47,6 +47,7 @@ public class CertificateController {
         Certificate cert = certificateService.createIntermediary(dto);
         return new ResponseEntity<>(cert, HttpStatus.OK);
     }
+
     @PostMapping("/end")
     public ResponseEntity<Certificate> createEndCertificate(
             @RequestBody CertificateRequestDto dto
@@ -56,19 +57,19 @@ public class CertificateController {
     }
 
     @PatchMapping("/{id}/revoke")
-    public ResponseEntity revokeCertificate(@PathVariable String id){
+    public ResponseEntity revokeCertificate(@PathVariable String id) {
         certificateService.handleRevokeCertificate(id);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @GetMapping("/{id}/revoke/check")
-    public ResponseEntity<RevocationDto> checkIfCertificateRevoked(@PathVariable String id){
+    public ResponseEntity<RevocationDto> checkIfCertificateRevoked(@PathVariable String id) {
         RevocationDto revocation = certificateService.checkIfCertificateRevoked(id);
         return new ResponseEntity<>(revocation, HttpStatus.OK);
     }
 
     @GetMapping("/download/{id}")
-    public ResponseEntity<byte[]> download(@PathVariable String id){
+    public ResponseEntity<byte[]> download(@PathVariable String id) {
         byte[] certificateBytes = new byte[0];
         try {
             certificateBytes = certificateService.downloadCertificate(id);
@@ -84,6 +85,7 @@ public class CertificateController {
                 .headers(headers)
                 .body(certificateBytes);
     }
+
     @PostMapping(value = "/verify")
     public ResponseEntity<Boolean> uploadFile(@RequestParam("file") MultipartFile file) {
         InputStream inputStream = null;
@@ -100,14 +102,22 @@ public class CertificateController {
     }
 
     @GetMapping("/findAll/{pageNumber}/{pageSize}")
-    public ResponseEntity<PageDto<Certificate>> findAll(@PathVariable int pageNumber, @PathVariable int pageSize){
+    public ResponseEntity<PageDto<Certificate>> findAll(@PathVariable int pageNumber, @PathVariable int pageSize) {
         PageDto<Certificate> certificates = certificateService.findAll(pageNumber, pageSize);
         return new ResponseEntity<>(certificates, HttpStatus.OK);
     }
 
     @GetMapping("/issuer")
-    public ResponseEntity<List<Certificate>> findIssuers(){
+    public ResponseEntity<List<Certificate>> findIssuers() {
         List<Certificate> certificates = certificateService.findIssuers();
+        return new ResponseEntity<>(certificates, HttpStatus.OK);
+    }
+
+    @GetMapping("/{serial}/chain")
+    public ResponseEntity<List<Certificate>> findCertificateChain(
+            @PathVariable String serial
+    ) {
+        List<Certificate> certificates = certificateService.findCertificateChain(serial);
         return new ResponseEntity<>(certificates, HttpStatus.OK);
     }
 }
