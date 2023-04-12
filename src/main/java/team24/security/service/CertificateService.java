@@ -88,7 +88,6 @@ public class CertificateService {
         List<Certificate> certificates = this.certificateRepository.findAllByIssuerSerial(serial);
         List<Certificate> children = new ArrayList<>();
         for (Certificate c : certificates) {
-            System.out.println(serial + " " + c.getSerialNumber());
             if (serial.equals(c.getSerialNumber())) continue;
             children.add(c);
             children.addAll(findCertificateChildren(c.getSerialNumber()));
