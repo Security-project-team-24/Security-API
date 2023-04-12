@@ -237,7 +237,7 @@ public class CertificateService {
         cert.setSerialNumber(uuid.toString());
         KeyPair keyPair = generateKeyPair();
 
-        boolean isIssuerCA = issuerCertificate.getBasicConstraints() == 1;
+        boolean isIssuerCA = issuerCertificate.getBasicConstraints() > 0;
         if(!isIssuerCA) throw new NoPermissionToGenerateCertificateException();
         if (!verifyUsage(issuerCert)) {
             throw new NoPermissionToGenerateCertificateException();
