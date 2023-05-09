@@ -109,7 +109,7 @@ public class CertificateService {
         cert.setSerialNumber(uuid.toString());
         cert.setIssuerSerial(uuid.toString());
         KeyPair keyPair = generateKeyPair();
-        int usage = getUsage(dto.getExtensions(),null);
+        int usage = getUsage(dto.getExtensions(),null, true);
         usage = usage | KeyUsage.digitalSignature | KeyUsage.keyCertSign;
         //TODO: validate data from issuer and for current certificate
         //Generate bouncy castle certificate with cert data
@@ -135,10 +135,10 @@ public class CertificateService {
         return cert;
     }
 
-    private static int getUsage(KeyUsageDto extensions, boolean[] issuerKeyUsage) {
+    private static int getUsage(KeyUsageDto extensions, boolean[] issuerKeyUsage,boolean isCA) {
         int usage = 0;
-        
         if(extensions.getCRLSign()){
+            if (!isCA) throw new CreateCertificateExtensionsException();
             if(issuerKeyUsage != null) {
                 boolean isIssuerCRLSignEnabled = issuerKeyUsage[6];
                 if (!isIssuerCRLSignEnabled) throw new CreateCertificateExtensionsException();
@@ -195,7 +195,7 @@ public class CertificateService {
             throw new NoPermissionToGenerateCertificateException();
         }
         boolean[] issuerKeyUsage = issuerCertificate.getKeyUsage();
-        int usage = getUsage(dto.getExtensions(),issuerKeyUsage);
+        int usage = getUsage(dto.getExtensions(),issuerKeyUsage, true);
         usage = usage | KeyUsage.digitalSignature | KeyUsage.keyCertSign;
         //TODO: validate data from issuer and for current certificate
         if (!verifyDateRange(dto.getStartDate(), dto.getEndDate(), issuerCert)) {
@@ -244,7 +244,7 @@ public class CertificateService {
         }
 
         boolean[] issuerKeyUsage = issuerCertificate.getKeyUsage();
-        int usage = getUsage(dto.getExtensions(),issuerKeyUsage);
+        int usage = getUsage(dto.getExtensions(),issuerKeyUsage,false);
         usage = usage | KeyUsage.digitalSignature;
         
         //TODO: validate data from issuer and for current certificate
